@@ -1,0 +1,46 @@
+# Автосборка HeroMod.asi на виртуальной Windows GitHub: ничего устанавливать у себя не нужно.
+# Запуск: вкладка Actions -> "Build HeroMod.asi" -> Run workflow. Готовый файл: раздел Artifacts.
+name: Build HeroMod.asi
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["Source/**", "build.bat", ".github/workflows/build.yml"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      PLUGIN_SDK_DIR: ${{ github.workspace }}\plugin-sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Скачать Plugin-SDK
+        uses: actions/checkout@v4
+        with:
+          repository: DK22Pac/plugin-sdk
+          path: plugin-sdk
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Собрать библиотеку plugin_vc
+        shell: pwsh
+        run: |
+          $proj = Get-ChildItem -Path plugin-sdk -Recurse -Filter plugin_vc.vcxproj | Select-Object -First 1
+          if (-not $proj) { throw "plugin_vc.vcxproj не найден в Plugin-SDK" }
+          msbuild $proj.FullName /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v143 /m
+
+      - name: Собрать HeroMod.asi
+        shell: cmd
+        run: build.bat
+
+      - name: Показать лог при ошибке
+        if: failure()
+        shell: cmd
+        run: type build_log.txt
+
+      - name: Сохранить результат
+        uses: actions/upload-artifact@v4
+        with:
+          name: HeroMod
+          path: Release/HeroMod.asi
